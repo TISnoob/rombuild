@@ -57,10 +57,10 @@ deploy:
   on:
     tags: false
     repo: yourusername/your-rom-repo
-    branch: master
+    branch: main
 branches:
   only:
-    - master
+    - main
   except:
     - /^(?i:untagged)-.*$/
     - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
