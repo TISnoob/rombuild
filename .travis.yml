@@ -4,79 +4,42 @@ dist: focal
 
 sudo: required
 
-addons:
-  apt:
-    packages:
-      - bc
-      - bison
-      - build-essential
-      - ccache
-      - curl
-      - flex
-      - g++-multilib
-      - gcc-multilib
-      - git
-      - git-lfs
-      - gnupg
-      - gperf
-      - imagemagick
-      - lib32ncurses5-dev
-      - lib32readline-dev
-      - lib32z1-dev
-      - liblz4-tool
-      - libncurses5
-      - libncurses5-dev
-      - libsdl1.2-dev
-      - libssl-dev
-      - libwxgtk3.0-gtk3-dev
-      - libxml2
-      - libxml2-utils
-      - lzop
-      - pngcrush
-      - rsync
-      - schedtool
-      - squashfs-tools
-      - xsltproc
-      - zip
-      - zlib1g-dev
-
 before_install:
-  # Install repo tool manually
-  - curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-  - chmod a+x ~/bin/repo
-  - export PATH=~/bin:$PATH
-  
-  # Setup git-lfs
-  - git lfs install
-  
-install:
-  - git config --global color.ui true
-  - git config --global user.email tisrijon9@gmail.com
-  - git config --global user.name TISnoob
-  # Initialize the repo for crDroid 14.0 with Git LFS
-  - repo init -u https://github.com/crdroidandroid/android.git -b 14.0 --git-lfs
-  # Sync the repo
-  - repo sync -j$(nproc) --force-sync
+  - sudo apt-get update
+  - sudo apt-get install -y git curl jq
 
-before_script:
-  # Setup ccache
-  - export USE_CCACHE=1
-  - ccache -M 50G
-  
 script:
-  # Start the build process (you'll need to replace 'target_device' with your device codename)
-  - . build/envsetup.sh
-  - lunch lineage_lancelot-userdebug
-  - mka bacon
+  # Generate a random image URL (this is a placeholder, you can change it to your own source)
+  - IMAGE_URL="https://picsum.photos/200"
+  - IMAGE_NAME="random_image_$(date +%s).jpg"
 
-cache:
-  directories:
-    - $HOME/.ccache
-    - $HOME/.repo
+  # Download the image
+  - curl -o $IMAGE_NAME $IMAGE_URL
+
+  # Define GitHub repository and release details
+  - REPO="your-github-username/your-repo-name"
+  - RELEASE_TAG="v$(date +%Y%m%d%H%M%S)"
+  - RELEASE_NAME="Random Image Release $(date +%Y-%m-%d)"
+  - RELEASE_BODY="This release contains a random image."
+
+  # Create a release via the GitHub API
+  - RESPONSE=$(curl -H "Authorization: token $GITHUB_TOKEN" \
+      -d "{\"tag_name\": \"$RELEASE_TAG\", \"name\": \"$RELEASE_NAME\", \"body\": \"$RELEASE_BODY\", \"draft\": false, \"prerelease\": false}" \
+      https://api.github.com/repos/$REPO/releases)
+
+  # Extract the release ID from the response
+  - RELEASE_ID=$(echo $RESPONSE | jq -r .id)
+
+  # Upload the image as a release asset
+  - UPLOAD_URL="https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$IMAGE_NAME"
+  - curl -H "Authorization: token $GITHUB_TOKEN" \
+      -H "Content-Type: application/octet-stream" \
+      --data-binary @$IMAGE_NAME \
+      $UPLOAD_URL
 
 notifications:
   email:
     recipients:
-      - tisrijon9@gmail.com
+      - your-email@example.com
     on_success: always
     on_failure: always
