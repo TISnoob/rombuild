@@ -4,54 +4,115 @@ dist: focal
 
 sudo: required
 
+addons:
+  apt:
+    packages:
+      - bc
+      - bison
+      - build-essential
+      - ccache
+      - curl
+      - flex
+      - g++-multilib
+      - gcc-multilib
+      - git
+      - git-lfs
+      - gnupg
+      - gperf
+      - imagemagick
+      - lib32ncurses5-dev
+      - lib32readline-dev
+      - lib32z1-dev
+      - liblz4-tool
+      - libncurses5
+      - libncurses5-dev
+      - libsdl1.2-dev
+      - libssl-dev
+      - libwxgtk3.0-gtk3-dev
+      - libxml2
+      - libxml2-utils
+      - lzop
+      - pngcrush
+      - rsync
+      - schedtool
+      - squashfs-tools
+      - xsltproc
+      - zip
+      - zlib1g-dev
+      - jq
+
 before_install:
-  - sudo apt-get update
-  - sudo apt-get install -y git curl jq
+  # Install repo tool manually
+  - curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+  - chmod a+x ~/bin/repo
+  - export PATH=~/bin:$PATH
+  
+  # Setup git-lfs
+  - git lfs install
+  
+install:
+  - git config --global color.ui true
+  - git config --global user.email "tisrijon9@gmail.com"
+  - git config --global user.name "TISnoob"
+  # Initialize the repo for crDroid 14.0 with Git LFS
+  - repo init -u https://github.com/crdroidandroid/android.git -b 14.0 --git-lfs
+  # Sync the repo
+  - repo sync -j$(nproc) --force-sync
+
+before_script:
+  # Setup ccache
+  - export USE_CCACHE=1
+  - ccache -M 200G
 
 script:
-  # Generate a random image URL (this is a placeholder, you can change it to your own source)
-  - IMAGE_URL="https://picsum.photos/200"
-  - IMAGE_NAME="random_image_$(date +%s).jpg"
+  # Start the build process
+  - . build/envsetup.sh
+  - lunch lineage_lancelot-userdebug
+  - mka bacon
 
-  # Download the image
-  - curl -o $IMAGE_NAME $IMAGE_URL
+after_success:
+  - echo "Build completed successfully!"
 
-  # Define GitHub repository and release details
-  - REPO="your-github-username/your-repo-name"
-  - RELEASE_TAG="v$(date +%Y%m%d%H%M%S)"
-  - RELEASE_NAME="Random Image Release $(date +%Y-%m-%d)"
-  - RELEASE_BODY="This release contains a random image."
+  # Define variables
+  - REPO="TISnoob/rombuild"
+  - GITHUB_TAG="v$(date +%Y%m%d%H%M%S)"
+  - GITHUB_RELEASE_NAME="ROM Release $(date +%Y-%m-%d)"
+  - GITHUB_RELEASE_BODY="This release contains the latest custom ROM build."
 
-  # Create a release via the GitHub API
+  # Create GitHub release via API
   - echo "Creating GitHub release..."
-  - RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-      -d "{\"tag_name\": \"$RELEASE_TAG\", \"name\": \"$RELEASE_NAME\", \"body\": \"$RELEASE_BODY\", \"draft\": false, \"prerelease\": false}" \
-      https://api.github.com/repos/$REPO/releases)
-
-  # Log the response for debugging purposes
-  - echo "GitHub API response:"
-  - echo $RESPONSE
-
-  # Extract the release ID from the response
+  - RESPONSE=$(curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" -d "{\"tag_name\": \"$GITHUB_TAG\", \"name\": \"$GITHUB_RELEASE_NAME\", \"body\": \"$GITHUB_RELEASE_BODY\", \"draft\": false, \"prerelease\": false}" https://api.github.com/repos/$REPO/releases)
+  
+  # Extract release ID from the response
   - RELEASE_ID=$(echo $RESPONSE | jq -r '.id')
-
-  # Check if the release ID was correctly extracted
   - if [ "$RELEASE_ID" == "null" ] || [ -z "$RELEASE_ID" ]; then
       echo "Failed to create release or parse release ID!";
       exit 1;
     fi
 
-  # Upload the image as a release asset
-  - echo "Uploading image as a release asset..."
-  - UPLOAD_URL="https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$IMAGE_NAME"
-  - curl -H "Authorization: token $GITHUB_TOKEN" \
-      -H "Content-Type: application/octet-stream" \
-      --data-binary @$IMAGE_NAME \
-      $UPLOAD_URL
+  # Find and upload all ROM files (e.g., zip, img, tar)
+  - echo "Searching for ROM files to upload..."
+  - ROM_FILES=$(find $PWD -type f \( -name "*.zip" -o -name "*.img" -o -name "*.tar" \))
+  - if [ -z "$ROM_FILES" ]; then
+      echo "No ROM files found!";
+      exit 0;
+    fi
+
+  # Upload each found file as an asset to the GitHub release
+  - for FILE in $ROM_FILES; do
+      echo "Uploading $FILE to GitHub release...";
+      UPLOAD_URL="https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$(basename $FILE)"
+      curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @$FILE $UPLOAD_URL;
+    done
+
+cache:
+  directories:
+    - $HOME/.ccache
+    - $HOME/.repo
 
 notifications:
   email:
     recipients:
-      - your-email@example.com
+      - tisrijon9@gmail.com
     on_success: always
     on_failure: always
