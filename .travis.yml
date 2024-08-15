@@ -2,62 +2,54 @@ os: linux
 dist: bionic
 language: generic
 sudo: required
-git:
-  depth: 1
-addons:
-  apt:
-    update:
-      - true
+
 services:
   - docker
+
 before_install:
-  # Pull the Docker image for the build environment
-  - docker pull docker pull fr3akyphantom/droid-builder:bionic
+  - docker pull fr3akyphantom/droid-builder:latest
+
 before_script:
-  # Set up directories for building
-  - cd $HOME
-  - mkdir -p android/rom
-  # Clone the repo tool if it's not included in your Docker image
-  - git clone https://android.googlesource.com/tools/repo
-  - export PATH=$PATH:$HOME/repo
-  # Initialize repo with the manifest URL for your ROM
-  - repo init -u https://github.com/crdroidandroid/android.git -b 14.0 --git-lfs
-script:
-  # Run the build environmnside Docker
+  - cd $HOME && mkdir crdroid
   - |
-    docker run --rm -i -e USER_ID=$(id -u) -e GROUP_ID=$(id -g) \
-      -v "$(pwd)/android/rom:/home/builder/rom/:rw,z" \
-      -v "${HOME}/.ccache:/srv/ccache:rw,z" \
-      fr3akyphantom/android-builder bash << EOF
-    # Navigate to the ROM source directory
-    cd /home/builder/rom
-    # Sync the source code
-    repo sync -j$(nproc --all)
-    # Source the environment setup script
+    TWRP_SOURCE="https://github.com/crdroidandroid/android_device_xiaomi_lancelot.git"
+    git clone $TWRP_SOURCE $HOME/crdroid/device/xiaomi/lancelot
+  - |
+    TWRP_KERNEL_SOURCE="https://github.com/crdroidandroid/android_kernel_xiaomi_lancelot.git"
+    git clone $TWRP_KERNEL_SOURCE $HOME/crdroid/kernel/xiaomi/lancelot
+  - |
+    TWRP_BOOTABLE_RECOVERY_SOURCE="https://github.com/crdroidandroid/android_bootable_recovery.git"
+    git clone $TWRP_BOOTABLE_RECOVERY_SOURCE -b android-12.1 --depth 1 $HOME/crdroid/bootable/recovery
+
+script:
+  - |
+    docker run --rm -i -e USER_ID=$(id -u) -e GROUP_ID=$(id -g) -v "$(pwd):/home/builder/crdroid/:rw,z" -v "${HOME}/.ccache:/srv/ccache:rw,z" fr3akyphantom/droid-builder bash << EOF
+    cd /home/builder/crdroid/
     source build/envsetup.sh
-    # Choose build target (e.g., "aosp_arm-eng")
-    lunch aosp_device-eng
-    # Start the build process
-    make -j$(nproc --all) otapackage
+    export ALLOW_MISSING_DEPENDENCIES=true
+    lunch crDroid_lancelot-eng
+    make -j$(nproc --all) recoveryimage
     exit
     EOF
+
 after_success:
-  # Copy build artifacts to a specific directory
-  - cp $HOME/android/rom/out/target/product/device/* $HOME/android/rom/
-  # Optionally upload build artifacts
-  - cd $HOME/android/rom/
-  # Uncomment if you want to use file.io or another file sharing service
-  # - curl -s --upload-file *.zip https://transfer.sh/ && echo ""
+  - export version=$(cat bootable/recovery/variables.h | grep "define TW_MAIN_VERSION_STR" | cut -d '"' -f2)
+  - cp $HOME/crdroid/out/target/product/lancelot/recovery.img $HOME/crdroid/TWRP-$version-lancelot-$(date +"%Y%m%d")-Unofficial.img
+  - cd $HOME/crdroid/
+  # Optional: You might need to switch from https://transfer.sh to https://file.io
+  # - curl -s --upload-file TWRP-$version-lancelot-$(date +"%Y%m%d")-Unofficial.img https://transfer.sh/ && echo ""
+
 deploy:
   skip_cleanup: true
   provider: releases
   api_key: $GitOAUTHToken
   file_glob: true
-  file: $HOME/android/rom/*
+  file: $HOME/crdroid/*.img
   on:
     tags: false
-    repo: yourusername/your-rom-repo
-    branch: main
+    repo: $USERNAME/$REPO_URL
+    branch: master
+
 branches:
   only:
     - main
