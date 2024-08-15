@@ -23,14 +23,26 @@ script:
   - RELEASE_BODY="This release contains a random image."
 
   # Create a release via the GitHub API
-  - RESPONSE=$(curl -H "Authorization: token $GITHUB_TOKEN" \
+  - echo "Creating GitHub release..."
+  - RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
       -d "{\"tag_name\": \"$RELEASE_TAG\", \"name\": \"$RELEASE_NAME\", \"body\": \"$RELEASE_BODY\", \"draft\": false, \"prerelease\": false}" \
       https://api.github.com/repos/$REPO/releases)
 
+  # Log the response for debugging purposes
+  - echo "GitHub API response:"
+  - echo $RESPONSE
+
   # Extract the release ID from the response
-  - RELEASE_ID=$(echo $RESPONSE | jq -r .id)
+  - RELEASE_ID=$(echo $RESPONSE | jq -r '.id')
+
+  # Check if the release ID was correctly extracted
+  - if [ "$RELEASE_ID" == "null" ] || [ -z "$RELEASE_ID" ]; then
+      echo "Failed to create release or parse release ID!";
+      exit 1;
+    fi
 
   # Upload the image as a release asset
+  - echo "Uploading image as a release asset..."
   - UPLOAD_URL="https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$IMAGE_NAME"
   - curl -H "Authorization: token $GITHUB_TOKEN" \
       -H "Content-Type: application/octet-stream" \
