@@ -41,6 +41,11 @@ addons:
       - zlib1g-dev
 
 before_install:
+  # Install repo tool manually
+  - curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+  - chmod a+x ~/bin/repo
+  - export PATH=~/bin:$PATH
+  
   # Setup git-lfs
   - git lfs install
   
@@ -58,7 +63,7 @@ before_script:
 script:
   # Start the build process (you'll need to replace 'target_device' with your device codename)
   - . build/envsetup.sh
-  - lunch lineage_target_device-userdebug
+  - lunch lineage_lancelot-userdebug
   - mka bacon
 
 cache:
@@ -69,6 +74,6 @@ cache:
 notifications:
   email:
     recipients:
-      - your-email@example.com
+      - tisrijon9@gmail.com
     on_success: always
     on_failure: always
