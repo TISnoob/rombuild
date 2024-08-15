@@ -1,58 +1,74 @@
-os: linux
-dist: bionic
-language: generic
+language: minimal
+
+dist: focal
+
 sudo: required
 
-services:
-  - docker
+addons:
+  apt:
+    packages:
+      - bc
+      - bison
+      - build-essential
+      - ccache
+      - curl
+      - flex
+      - g++-multilib
+      - gcc-multilib
+      - git
+      - git-lfs
+      - gnupg
+      - gperf
+      - imagemagick
+      - lib32ncurses5-dev
+      - lib32readline-dev
+      - lib32z1-dev
+      - liblz4-tool
+      - libncurses5
+      - libncurses5-dev
+      - libsdl1.2-dev
+      - libssl-dev
+      - libwxgtk3.0-gtk3-dev
+      - libxml2
+      - libxml2-utils
+      - lzop
+      - pngcrush
+      - rsync
+      - schedtool
+      - squashfs-tools
+      - xsltproc
+      - zip
+      - zlib1g-dev
 
 before_install:
-  - docker pull fr3akyphantom/droid-builder:latest
+  # Setup git-lfs
+  - git lfs install
+  
+install:
+  # Initialize the repo for crDroid 14.0 with Git LFS
+  - repo init -u https://github.com/crdroidandroid/android.git -b 14.0 --git-lfs
+  # Sync the repo
+  - repo sync -j$(nproc) --force-sync
 
 before_script:
-  - cd $HOME && mkdir crdroid
-  - |
-    TWRP_SOURCE="https://github.com/crdroidandroid/android_device_xiaomi_lancelot.git"
-    git clone $TWRP_SOURCE $HOME/crdroid/device/xiaomi/lancelot
-  - |
-    TWRP_KERNEL_SOURCE="https://github.com/crdroidandroid/android_kernel_xiaomi_lancelot.git"
-    git clone $TWRP_KERNEL_SOURCE $HOME/crdroid/kernel/xiaomi/lancelot
-  - |
-    TWRP_BOOTABLE_RECOVERY_SOURCE="https://github.com/crdroidandroid/android_bootable_recovery.git"
-    git clone $TWRP_BOOTABLE_RECOVERY_SOURCE -b android-12.1 --depth 1 $HOME/crdroid/bootable/recovery
-
+  # Setup ccache
+  - export USE_CCACHE=1
+  - ccache -M 50G
+  
 script:
-  - |
-    docker run --rm -i -e USER_ID=$(id -u) -e GROUP_ID=$(id -g) -v "$(pwd):/home/builder/crdroid/:rw,z" -v "${HOME}/.ccache:/srv/ccache:rw,z" fr3akyphantom/droid-builder bash << EOF
-    cd /home/builder/crdroid/
-    source build/envsetup.sh
-    export ALLOW_MISSING_DEPENDENCIES=true
-    lunch crDroid_lancelot-eng
-    make -j$(nproc --all) recoveryimage
-    exit
-    EOF
+  # Start the build process (you'll need to replace 'target_device' with your device codename)
+  - . build/envsetup.sh
+  - lunch lineage_target_device-userdebug
+  - mka bacon
 
-after_success:
-  - export version=$(cat bootable/recovery/variables.h | grep "define TW_MAIN_VERSION_STR" | cut -d '"' -f2)
-  - cp $HOME/crdroid/out/target/product/lancelot/recovery.img $HOME/crdroid/TWRP-$version-lancelot-$(date +"%Y%m%d")-Unofficial.img
-  - cd $HOME/crdroid/
-  # Optional: You might need to switch from https://transfer.sh to https://file.io
-  # - curl -s --upload-file TWRP-$version-lancelot-$(date +"%Y%m%d")-Unofficial.img https://transfer.sh/ && echo ""
+cache:
+  directories:
+    - $HOME/.ccache
+    - $HOME/.repo
 
-deploy:
-  skip_cleanup: true
-  provider: releases
-  api_key: $GitOAUTHToken
-  file_glob: true
-  file: $HOME/crdroid/*.img
-  on:
-    tags: false
-    repo: $USERNAME/$REPO_URL
-    branch: master
-
-branches:
-  only:
-    - main
-  except:
-    - /^(?i:untagged)-.*$/
-    - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
+notifications:
+  email:
+    recipients:
+      - your-email@example.com
+    on_success: always
+    on_failure: always
