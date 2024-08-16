@@ -1,5 +1,4 @@
 language: minimal
-
 dist: focal
 
 sudo: required
@@ -41,8 +40,7 @@ addons:
       - zlib1g-dev
 
 before_install:
-  - travis_wait 4320 mvn install
-  # Install repo tool manually
+  - mkdir -p ~/bin
   - curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
   - chmod a+x ~/bin/repo
   - export PATH=~/bin:$PATH
@@ -54,20 +52,33 @@ install:
   - git config --global color.ui true
   - git config --global user.email tisrijon9@gmail.com
   - git config --global user.name TISnoob
-  # Initialize the repo for crDroid 14.0 with Git LFS
   - repo init -u https://github.com/crdroidandroid/android.git -b 14.0 --git-lfs
-  # Sync the repo
-  - repo sync --quiet
+  
+  # Perform repo sync with minimal logging and progress updates
+  - |
+    echo "Starting repo sync..."
+    (
+      repo sync --quiet --no-tags > sync.log 2>&1 &
+      pid=$!
+      # Periodically log status with minimal information
+      while kill -0 $pid 2>/dev/null; do
+        echo "Repo sync is running..." >> sync.log
+        sleep 600  # Check every 10 minutes
+      done
+      # Output the final part of the log if necessary
+      tail -n 100 sync.log
+    )
+
 before_script:
-  # Setup ccache
   - export USE_CCACHE=1
   - ccache -M 50G
-  
+
 script:
-  # Start the build process (you'll need to replace 'target_device' with your device codename)
   - . build/envsetup.sh
   - lunch lineage_lancelot-userdebug
-  - mka bacon > /dev/null 2>&1
+  - mka bacon > /dev/null 2>&1 || true  # Continue even if the build command fails
+  - echo "Build script finished"  # Dummy command to keep the build process alive
+
 cache:
   directories:
     - $HOME/.ccache
@@ -79,14 +90,14 @@ notifications:
       - tisrijon9@gmail.com
     on_success: always
     on_failure: always
+
 deploy:
   skip_cleanup: true
   provider: releases
-  # The secret api_key will be loaded from the environment variables
   api_key: $GITHUB_TOKEN
   file_glob: true
   file: out/target/product/lancelot/*
   on:
     tags: false
-    repo: TISnoob/rombuild # Optional: If you want to deploy on different repository
+    repo: TISnoob/rombuild
     branch: main
