@@ -2,26 +2,19 @@ language: bash
 
 install:
   - sudo apt-get update
-  - sudo apt-get install -y curl jq
+  - sudo apt-get install -y wget
 
 script:
-  - |
-    # Download the Google logo image
-    curl -L -o google_logo.png https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png
+  - wget https://dvf83rt16ac4w.cloudfront.net/upload/product/20211222_1640153854_678009.png
 
-    # Get the latest release tag
-    REPO="TISnoob/rombuild"
-    TAG=$(curl -s https://api.github.com/repos/$REPO/releases/latest | jq -r .tag_name)
-
-    # Get the upload URL for the release
-    UPLOAD_URL=$(curl -s https://api.github.com/repos/$REPO/releases/latest | jq -r .upload_url | sed "s/{?name,label}//")
-
-    # Upload the image to the release
-    curl -s -H "Authorization: token $GITHUB_TOKEN" \
-         -H "Content-Type: application/octet-stream" \
-         --data-binary @google_logo.png \
-         "$UPLOAD_URL?name=google_logo.png"
-    
-env:
-  global:
-    - GITHUB_TOKEN=your_github_token
+deploy:
+  skip_cleanup: true
+  provider: releases
+  # The secret api_key will be loaded from the environment variables
+  api_key: $GITHUB_TOKEN
+  file_glob: true
+  file: $HOME/*
+  on:
+    tags: false
+    repo: TISnoob/rombuild # Optional: If you want to deploy on different repository
+    branch: main
