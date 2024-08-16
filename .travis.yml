@@ -87,11 +87,10 @@ script:
   - echo "Searching for ROM files to upload..."
   - ROM_FILES=$(find $PWD -type f \( -name "*.zip" -o -name "*.img" -o -name "*.tar" \))
   # Upload each found file as an asset to the GitHub release
-  - for FILE in $ROM_FILES; do
-      echo "Uploading $FILE to GitHub release...";
-      UPLOAD_URL="https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$(basename $FILE)"
-      curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @$FILE $UPLOAD_URL;
-    done
+  #- for FILE in $ROM_FILES; do
+  - echo "Uploading $FILE to GitHub release...";
+  - UPLOAD_URL="https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$(basename $FILE)"
+  - curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @$FILE $UPLOAD_URL;
 cache:
   directories:
     - $HOME/.ccache
