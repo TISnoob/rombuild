@@ -56,7 +56,7 @@ install:
   # Initialize the repo for crDroid 14.0 with Git LFS
   - repo init -u https://github.com/crdroidandroid/android.git -b 14.0 --git-lfs
   # Sync the repo
-  - repo sync -j$(nproc) --force-sync
+  - repo sync --quiet
 
 before_script:
   # Setup ccache
@@ -67,7 +67,7 @@ script:
   # Start the build process (you'll need to replace 'target_device' with your device codename)
   - . build/envsetup.sh
   - lunch lineage_lancelot-userdebug
-  - mka bacon
+  - mka bacon > /dev/null 2>&1
 cache:
   directories:
     - $HOME/.ccache
