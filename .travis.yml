@@ -47,7 +47,7 @@ before_install:
   
   # Setup git-lfs
   - git lfs install
-  
+
 install:
   - git config --global color.ui true
   - git config --global user.email tisrijon9@gmail.com
@@ -58,12 +58,17 @@ install:
   - |
     echo "Starting repo sync..."
     (
-      repo sync --quiet > /dev/null 2>&1 &
+      repo sync --quiet > /dev/null 2> sync_errors.log &
       pid=$!
       while kill -0 $pid 2>/dev/null; do
         echo "Repo sync is still running..."
-        sleep 580  # Print status every 9 minutes (540 seconds)
+        sleep 580
       done
+      if [ -s sync_errors.log ]; then
+        echo "Repo sync completed with errors:"
+        cat sync_errors.log
+        exit 1
+      fi
       echo "Repo sync completed."
     )
   
@@ -72,19 +77,27 @@ before_script:
   - ccache -M 50G
 
 script:
-  # Run mka bacon with periodic progress updates
   - |
     echo "Starting build..."
     (
-      . build/envsetup.sh
-      lunch lineage_lancelot-userdebug
-      mka bacon > /dev/null 2>&1 &
-      pid=$!
-      while kill -0 $pid 2>/dev/null; do
-        echo "Build is still running..."
-        sleep 580  # Print status every 9 minutes (540 seconds)
-      done
-      echo "Build completed."
+      if [ -f build/envsetup.sh ]; then
+        . build/envsetup.sh
+        brunch lancelot > /dev/null 2> build_errors.log &
+        pid=$!
+        while kill -0 $pid 2>/dev/null; do
+          echo "Build is still running..."
+          sleep 580
+        done
+        if [ -s build_errors.log ]; then
+          echo "Build completed with errors:"
+          cat build_errors.log
+          exit 1
+        fi
+        echo "Build completed."
+      else
+        echo "build/envsetup.sh not found. Please check repo sync and directory structure."
+        exit 1
+      fi
     )
 
 cache:
