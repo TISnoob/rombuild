@@ -50,6 +50,7 @@ before_install:
   - git lfs install
   
 install:
+  - travis_wait 4320 mvn install
   - git config --global color.ui true
   - git config --global user.email tisrijon9@gmail.com
   - git config --global user.name TISnoob
@@ -57,7 +58,6 @@ install:
   - repo init -u https://github.com/crdroidandroid/android.git -b 14.0 --git-lfs
   # Sync the repo
   - repo sync --quiet
-
 before_script:
   # Setup ccache
   - export USE_CCACHE=1
@@ -85,7 +85,7 @@ deploy:
   # The secret api_key will be loaded from the environment variables
   api_key: $GITHUB_TOKEN
   file_glob: true
-  file: $OUT/*
+  file: out/target/product/lancelot/*
   on:
     tags: false
     repo: TISnoob/rombuild # Optional: If you want to deploy on different repository
