@@ -68,29 +68,6 @@ script:
   - . build/envsetup.sh
   - lunch lineage_lancelot-userdebug
   - mka bacon
-  - echo "Build completed successfully!"
-
-  # Define variables
-  - REPO="TISnoob/rombuild"
-  - GITHUB_TAG="v$(date +%Y%m%d%H%M%S)"
-  - GITHUB_RELEASE_NAME="ROM Release $(date +%Y-%m-%d)"
-  - GITHUB_RELEASE_BODY="This release contains the latest custom ROM build."
-
-  # Create GitHub release via API
-  - echo "Creating GitHub release..."
-  - RESPONSE=$(curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" -d "{\"tag_name\": \"$GITHUB_TAG\", \"name\": \"$GITHUB_RELEASE_NAME\", \"body\": \"$GITHUB_RELEASE_BODY\", \"draft\": false, \"prerelease\": false}" https://api.github.com/repos/$REPO/releases)
-  
-  # Extract release ID from the response
-  - RELEASE_ID=$(echo $RESPONSE | jq -r '.id')
-
-  # Find and upload all ROM files (e.g., zip, img, tar)
-  - echo "Searching for ROM files to upload..."
-  - ROM_FILES=$(find $PWD -type f \( -name "*.zip" -o -name "*.img" -o -name "*.tar" \))
-  # Upload each found file as an asset to the GitHub release
-  #- for FILE in $ROM_FILES; do
-  - echo "Uploading $FILE to GitHub release...";
-  - UPLOAD_URL="https://uploads.github.com/repos/$REPO/releases/$RELEASE_ID/assets?name=$(basename $FILE)"
-  - curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @$FILE $UPLOAD_URL;
 cache:
   directories:
     - $HOME/.ccache
