@@ -68,7 +68,6 @@ script:
   - . build/envsetup.sh
   - lunch lineage_lancelot-userdebug
   - mka bacon
-after_success:
   - echo "Build completed successfully!"
 
   # Define variables
@@ -83,19 +82,10 @@ after_success:
   
   # Extract release ID from the response
   - RELEASE_ID=$(echo $RESPONSE | jq -r '.id')
-  - if [ "$RELEASE_ID" == "null" ] || [ -z "$RELEASE_ID" ]; then
-      echo "Failed to create release or parse release ID!";
-      exit 1;
-    fi
 
   # Find and upload all ROM files (e.g., zip, img, tar)
   - echo "Searching for ROM files to upload..."
   - ROM_FILES=$(find $PWD -type f \( -name "*.zip" -o -name "*.img" -o -name "*.tar" \))
-  - if [ -z "$ROM_FILES" ]; then
-      echo "No ROM files found!";
-      exit 0;
-    fi
-
   # Upload each found file as an asset to the GitHub release
   - for FILE in $ROM_FILES; do
       echo "Uploading $FILE to GitHub release...";
