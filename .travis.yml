@@ -41,6 +41,7 @@ addons:
       - zlib1g-dev
 
 before_install:
+  - travis_wait 4320 mvn install
   # Install repo tool manually
   - curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
   - chmod a+x ~/bin/repo
@@ -50,7 +51,6 @@ before_install:
   - git lfs install
   
 install:
-  - travis_wait 4320 mvn install
   - git config --global color.ui true
   - git config --global user.email tisrijon9@gmail.com
   - git config --global user.name TISnoob
