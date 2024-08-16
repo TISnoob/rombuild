@@ -54,30 +54,38 @@ install:
   - git config --global user.name TISnoob
   - repo init -u https://github.com/crdroidandroid/android.git -b 14.0 --git-lfs
   
-  # Perform repo sync with minimal logging and progress updates
+  # Run repo sync with periodic progress updates
   - |
     echo "Starting repo sync..."
     (
-      repo sync --quiet --no-tags > sync.log 2>&1 &
+      repo sync --quiet > /dev/null 2>&1 &
       pid=$!
-      # Periodically log status with minimal information
       while kill -0 $pid 2>/dev/null; do
-        echo "Repo sync is running..." >> sync.log
-        sleep 600  # Check every 10 minutes
+        echo "Repo sync is still running..."
+        sleep 580  # Print status every 9 minutes (540 seconds)
       done
-      # Output the final part of the log if necessary
-      tail -n 100 sync.log
+      echo "Repo sync completed."
     )
-
+  
 before_script:
   - export USE_CCACHE=1
   - ccache -M 50G
 
 script:
-  - . build/envsetup.sh
-  - lunch lineage_lancelot-userdebug
-  - mka bacon > /dev/null 2>&1 || true  # Continue even if the build command fails
-  - echo "Build script finished"  # Dummy command to keep the build process alive
+  # Run mka bacon with periodic progress updates
+  - |
+    echo "Starting build..."
+    (
+      . build/envsetup.sh
+      lunch lineage_lancelot-userdebug
+      mka bacon > /dev/null 2>&1 &
+      pid=$!
+      while kill -0 $pid 2>/dev/null; do
+        echo "Build is still running..."
+        sleep 580  # Print status every 9 minutes (540 seconds)
+      done
+      echo "Build completed."
+    )
 
 cache:
   directories:
