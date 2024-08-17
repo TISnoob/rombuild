@@ -1,124 +1,86 @@
-language: minimal
+# .travis.yml
+
 dist: focal
+language: minimal
 
-sudo: required
+branches:
+  only:
+    - master  # adjust this based on the branch you want to build
 
-addons:
-  apt:
-    packages:
-      - bc
-      - bison
-      - build-essential
-      - ccache
-      - curl
-      - flex
-      - g++-multilib
-      - gcc-multilib
-      - git
-      - git-lfs
-      - gnupg
-      - gperf
-      - imagemagick
-      - lib32ncurses5-dev
-      - lib32readline-dev
-      - lib32z1-dev
-      - liblz4-tool
-      - libncurses5
-      - libncurses5-dev
-      - libsdl1.2-dev
-      - libssl-dev
-      - libwxgtk3.0-gtk3-dev
-      - libxml2
-      - libxml2-utils
-      - lzop
-      - pngcrush
-      - rsync
-      - schedtool
-      - squashfs-tools
-      - xsltproc
-      - zip
-      - zlib1g-dev
-
-before_install:
-  - mkdir -p ~/bin
-  - curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
-  - chmod a+x ~/bin/repo
-  - export PATH=~/bin:$PATH
-  
-  # Setup git-lfs
-  - git lfs install
-
-install:
-  - git config --global color.ui true
-  - git config --global user.email tisrijon9@gmail.com
-  - git config --global user.name TISnoob
-  - repo init -u https://github.com/crdroidandroid/android.git -b 14.0 --git-lfs
-  
-  # Run repo sync with periodic progress updates
-  - |
-    echo "Starting repo sync..."
-    (
-      repo sync --quiet > /dev/null 2> sync_errors.log &
-      pid=$!
-      while kill -0 $pid 2>/dev/null; do
-        echo "Repo sync is still running..."
-        sleep 580
-      done
-      if [ -s sync_errors.log ]; then
-        echo "Repo sync completed with errors:"
-        cat sync_errors.log
-        exit 1
-      fi
-      echo "Repo sync completed."
-    )
-  
-before_script:
-  - export USE_CCACHE=1
-  - ccache -M 50G
-
-script:
-  - |
-    echo "Starting build..."
-    (
-      if [ -f build/envsetup.sh ]; then
-        . build/envsetup.sh
-        brunch lancelot > /dev/null 2> build_errors.log &
-        pid=$!
-        while kill -0 $pid 2>/dev/null; do
-          echo "Build is still running..."
-          sleep 580
-        done
-        if [ -s build_errors.log ]; then
-          echo "Build completed with errors:"
-          cat build_errors.log
-          exit 1
-        fi
-        echo "Build completed."
-      else
-        echo "build/envsetup.sh not found. Please check repo sync and directory structure."
-        exit 1
-      fi
-    )
-
+# Cache Gradle dependencies and Android SDK
 cache:
   directories:
     - $HOME/.ccache
-    - $HOME/.repo
+    - $HOME/.gradle/caches/
+    - $HOME/.gradle/wrapper/
+    - $HOME/android-sdk/
+
+before_install:
+  - sudo apt-get update
+  - sudo apt-get install -y openjdk-11-jdk git-core gnupg flex bison build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip bc ccache libssl-dev ninja-build python3 python-is-python3 jq
+
+# Set up environment variables
+env:
+  global:
+    - MAKEFLAGS="-j$(nproc)"
+    - USE_CCACHE=1
+    - CCACHE_EXEC=$(which ccache)
+    - CCACHE_DIR=$HOME/.ccache
+    - GITHUB_TOKEN=$GITHUB_TOKEN  # Add your GitHub token here
+    - REPO_OWNER=TISnoob  # Replace with your GitHub username
+    - REPO_NAME=rombuild  # Replace with your GitHub repo name
+    - DEVICE_CODENAME=lancelot # Replace with your device codename
+
+before_script:
+  - export BUILD_DIR="$HOME/rom"
+  - mkdir -p $BUILD_DIR
+  - cd $BUILD_DIR
+
+# Function to keep the build alive
+keepalive() {
+  while true; do echo "Keeping Travis alive..."; sleep 540; done &
+}
+
+# Start the keepalive function
+script:
+  - keepalive
+  - echo "Cloning and syncing repositories silently..."
+  - git clone https://github.com/crdroidandroid/android.git -b 13.0 crdroid > /dev/null 2>&1
+  - cd crdroid
+  - repo init -u https://github.com/crdroidandroid/android.git -b 13.0 > /dev/null 2>&1
+  - repo sync --force-sync --no-tags --no-clone-bundle --optimized-fetch --prune -j$(nproc) > /dev/null 2>&1
+
+# Start building ROM without showing output
+  - source build/envsetup.sh
+  - lunch lineage_lancelot-userdebug
+  - make bacon > /dev/null 2>&1
+
+after_success:
+  - echo "Build successful, preparing files for upload..."
+  - cd $BUILD_DIR/crdroid/out/target/product/lancelot
+
+  # Find the generated ROM and recovery image
+  - ROM_FILE=$(ls *.zip)
+  - RECOVERY_FILE=$(ls recovery.img)
+
+  # Create a new release and upload the files to GitHub
+  - echo "Uploading ROM and recovery image to GitHub Release..."
+  - TAG_NAME="build-$(date +'%Y%m%d-%H%M%S')"
+  - API_JSON=$(printf '{"tag_name": "%s","target_commitish": "master","name": "Build %s","body": "Automated ROM build for %s","draft": false,"prerelease": false}' $TAG_NAME $TAG_NAME $DEVICE_CODENAME)
+  - UPLOAD_URL=$(curl -H "Authorization: token $GITHUB_TOKEN" -d "$API_JSON" "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases" | jq -r .upload_url | sed "s/{?name,label}//")
+
+  # Upload the ROM zip
+  - curl -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/zip" --data-binary @$ROM_FILE "$UPLOAD_URL?name=$(basename $ROM_FILE)"
+
+  # Upload the recovery image
+  - curl -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @$RECOVERY_FILE "$UPLOAD_URL?name=$(basename $RECOVERY_FILE)"
+
+after_failure:
+  - echo "Build failed."
 
 notifications:
   email:
     recipients:
       - tisrijon9@gmail.com
-    on_success: always
+    on_success: change
     on_failure: always
-
-deploy:
-  skip_cleanup: true
-  provider: releases
-  api_key: $GITHUB_TOKEN
-  file_glob: true
-  file: out/target/product/lancelot/*
-  on:
-    tags: false
-    repo: TISnoob/rombuild
-    branch: main
