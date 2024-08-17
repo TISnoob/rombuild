@@ -1,12 +1,12 @@
-# .travis.yml
-
+language: android
 dist: focal
-language: minimal
 
+# Only build for the master branch (customize as needed)
 branches:
   only:
-    - master  # adjust this based on the branch you want to build
+    - master
 
+# Cache Gradle and ccache directories
 cache:
   directories:
     - $HOME/.ccache
@@ -14,61 +14,72 @@ cache:
     - $HOME/.gradle/wrapper/
     - $HOME/android-sdk/
 
-before_install:
-  - sudo apt-get update
-  - sudo apt-get install -y openjdk-11-jdk git-core gnupg flex bison build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip bc ccache libssl-dev ninja-build python3 python-is-python3 jq
-
+# Set environment variables
 env:
   global:
     - MAKEFLAGS="-j$(nproc)"
     - USE_CCACHE=1
-    - CCACHE_EXEC=$(which ccache)
     - CCACHE_DIR=$HOME/.ccache
-#    - GITHUB_TOKEN=<your_github_token>  # Add your GitHub token here
-    - REPO_OWNER=TISnoob  # Replace with your GitHub username
-    - REPO_NAME=rombuild  # Replace with your GitHub repo name
-    - DEVICE_CODENAME=lancelot # Replace with your device codename
+#    - GITHUB_TOKEN=<your_github_token>  # Add your GitHub token securely
+    - REPO_OWNER=TISnoob # Your GitHub username
+    - REPO_NAME=rombuild # Your GitHub repo name
+    - DEVICE_CODENAME=lancelot # Your device codename (e.g. "whyred")
+
+android:
+  components:
+    - tools
+    - platform-tools
+    - build-tools-34.0.0
+    - android-34
+  licenses:
+    - 'android-sdk-license-.+'
+
+before_install:
+  # Install required packages
+  - sudo apt-get update
+  - sudo apt-get install -y openjdk-11-jdk git-core gnupg flex bison build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip bc ccache libssl-dev ninja-build python3 python-is-python3 jq
 
 before_script:
+  # Keep build alive to prevent timeout
+  - while true; do echo "Keeping Travis alive..."; sleep 540; done &
+  
+  # Set up build directory
   - export BUILD_DIR="$HOME/rom"
   - mkdir -p $BUILD_DIR
   - cd $BUILD_DIR
 
-keepalive() {
-  while true; do echo "Keeping Travis alive..."; sleep 540; done &
-}
-
-script:
-  - keepalive
-  - echo "Cloning and syncing repositories silently..."
+  # Silent cloning and syncing
   - git clone https://github.com/crdroidandroid/android.git -b 14.0 crdroid > /dev/null 2>&1
   - cd crdroid
   - repo init -u https://github.com/crdroidandroid/android.git -b 14.0 > /dev/null 2>&1
   - repo sync --force-sync --no-tags --no-clone-bundle --optimized-fetch --prune -j$(nproc) > /dev/null 2>&1
 
+# Build ROM with no log output
+script:
   - source build/envsetup.sh
   - lunch lineage_$DEVICE_CODENAME-userdebug
   - make bacon > /dev/null 2>&1
 
 after_success:
-  - echo "Build successful, preparing files for upload..."
+  - echo "Build successful, preparing to upload ROM and recovery image..."
   - cd $BUILD_DIR/crdroid/out/target/product/$DEVICE_CODENAME
 
-  # Find the generated ROM and recovery image
+  # Get the ROM and recovery image filenames
   - ROM_FILE=$(ls *.zip)
   - RECOVERY_FILE=$(ls recovery.img)
 
-  # Create a new GitHub release
+  # Create GitHub release
   - TAG_NAME="build-$(date +'%Y%m%d-%H%M%S')"
-  - API_JSON=$(printf '{"tag_name": "%s", "target_commitish": "master", "name": "Build %s", "body": "Automated ROM build for %s", "draft": false, "prerelease": false}' $TAG_NAME $TAG_NAME $DEVICE_CODENAME)
-  - RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" -d "$API_JSON" "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases")
-  - UPLOAD_URL=$(echo $RESPONSE | jq -r .upload_url | sed -e "s/{?name,label}//")
+  - RELEASE_RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" -d "{\"tag_name\": \"$TAG_NAME\", \"target_commitish\": \"master\", \"name\": \"Build $TAG_NAME\", \"body\": \"Automated ROM build for $DEVICE_CODENAME\", \"draft\": false, \"prerelease\": false}" "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases")
 
-  # Upload the ROM zip
-  - echo "Uploading ROM file..."
+  # Extract upload URL
+  - UPLOAD_URL=$(echo $RELEASE_RESPONSE | jq -r '.upload_url' | sed 's/{?name,label}//')
+
+  # Upload ROM
+  - echo "Uploading ROM..."
   - curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/zip" --data-binary @$ROM_FILE "$UPLOAD_URL?name=$(basename $ROM_FILE)"
 
-  # Upload the recovery image
+  # Upload recovery image
   - echo "Uploading recovery image..."
   - curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @$RECOVERY_FILE "$UPLOAD_URL?name=$(basename $RECOVERY_FILE)"
 
