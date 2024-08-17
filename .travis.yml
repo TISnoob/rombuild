@@ -20,21 +20,23 @@ env:
     - MAKEFLAGS="-j$(nproc)"
     - USE_CCACHE=1
     - CCACHE_DIR=$HOME/.ccache
-    - DEVICE_CODENAME=lancelot # Your device codename (e.g. "whyred")
+    - DEVICE_CODENAME="lancelot"  # Your device codename (e.g., "whyred")
+    - ANDROID_VERSION="14"  # Android 14
 
 android:
   components:
     - tools
     - platform-tools
-    - build-tools-34.0.0
-    - android-34
+    - build-tools-34.0.0  # Adjust if there's a newer build tools version
+    - android-$ANDROID_VERSION
   licenses:
     - 'android-sdk-license-.+'
 
 before_install:
-  # Install required packages
-  - sudo apt-get update
-  - sudo apt-get install -y openjdk-11-jdk git-core gnupg flex bison build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip bc ccache libssl-dev ninja-build python3 python-is-python3 jq
+  # Update and install required packages silently
+  - echo "Updating and installing dependencies silently..."
+  - sudo apt-get update -yq > /dev/null 2>&1 || true
+  - sudo apt-get install -yq openjdk-11-jdk git-core gnupg flex bison build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip bc ccache libssl-dev ninja-build python3 python-is-python3 jq > /dev/null 2>&1 || true
 
 before_script:
   # Keep build alive to prevent timeout
@@ -46,6 +48,7 @@ before_script:
   - cd $BUILD_DIR
 
   # Silent cloning and syncing
+  - echo "Cloning and syncing crDroid silently..."
   - git clone https://github.com/crdroidandroid/android.git -b 14.0 crdroid > /dev/null 2>&1
   - cd crdroid
   - repo init -u https://github.com/crdroidandroid/android.git -b 14.0 > /dev/null 2>&1
@@ -53,6 +56,7 @@ before_script:
 
 # Build ROM with no log output
 script:
+  - echo "Building the ROM silently..."
   - source build/envsetup.sh
   - lunch lineage_$DEVICE_CODENAME-userdebug
   - make bacon > /dev/null 2>&1
@@ -68,7 +72,7 @@ deploy:
   skip_cleanup: true
   on:
     tags: false
-    branch: main  # Deploy on the master branch
+    branch: main # Deploy on the master branch
 
 after_failure:
   - echo "Build failed."
@@ -76,6 +80,6 @@ after_failure:
 notifications:
   email:
     recipients:
-      - your_email@example.com
+      - tisrijon9@gmail.com
     on_success: change
     on_failure: always
