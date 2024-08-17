@@ -4,7 +4,7 @@ dist: focal
 # Only build for the master branch (customize as needed)
 branches:
   only:
-    - master
+    - main
 
 # Cache Gradle and ccache directories
 cache:
