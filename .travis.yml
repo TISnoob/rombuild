@@ -20,9 +20,6 @@ env:
     - MAKEFLAGS="-j$(nproc)"
     - USE_CCACHE=1
     - CCACHE_DIR=$HOME/.ccache
-#    - GITHUB_TOKEN=<your_github_token>  # Add your GitHub token securely
-    - REPO_OWNER=TISnoob # Your GitHub username
-    - REPO_NAME=rombuild # Your GitHub repo name
     - DEVICE_CODENAME=lancelot # Your device codename (e.g. "whyred")
 
 android:
@@ -60,35 +57,25 @@ script:
   - lunch lineage_$DEVICE_CODENAME-userdebug
   - make bacon > /dev/null 2>&1
 
-#after_success:
-  - echo "Build successful, preparing to upload ROM and recovery image..."
-  - cd $BUILD_DIR/crdroid/out/target/product/$DEVICE_CODENAME
+# After success, the deploy section will automatically handle the file upload
+deploy:
+  provider: releases
+  token: $GITHUB_TOKEN  # The GitHub token should be stored in Travis CI environment variables
+  file_glob: true
+  file: 
+    - "$BUILD_DIR/crdroid/out/target/product/$DEVICE_CODENAME/*.zip"
+    - "$BUILD_DIR/crdroid/out/target/product/$DEVICE_CODENAME/recovery.img"
+  skip_cleanup: true
+  on:
+    tags: false
+    branch: main  # Deploy on the master branch
 
-  # Get the ROM and recovery image filenames
-  - ROM_FILE=$(ls *.zip)
-  - RECOVERY_FILE=$(ls recovery.img)
-
-  # Create GitHub release
-  - TAG_NAME="build-$(date +'%Y%m%d-%H%M%S')"
-  - RELEASE_RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" -d "{\"tag_name\": \"$TAG_NAME\", \"target_commitish\": \"master\", \"name\": \"Build $TAG_NAME\", \"body\": \"Automated ROM build for $DEVICE_CODENAME\", \"draft\": false, \"prerelease\": false}" "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases")
-
-  # Extract upload URL
-  - UPLOAD_URL=$(echo $RELEASE_RESPONSE | jq -r '.upload_url' | sed 's/{?name,label}//')
-
-  # Upload ROM
-  - echo "Uploading ROM..."
-  - curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/zip" --data-binary @$ROM_FILE "$UPLOAD_URL?name=$(basename $ROM_FILE)"
-
-  # Upload recovery image
-  - echo "Uploading recovery image..."
-  - curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @$RECOVERY_FILE "$UPLOAD_URL?name=$(basename $RECOVERY_FILE)"
-
-#after_failure:
+after_failure:
   - echo "Build failed."
 
 notifications:
   email:
     recipients:
-      - tisrijon9@gmail.com
+      - your_email@example.com
     on_success: change
     on_failure: always
