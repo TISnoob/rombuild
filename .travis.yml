@@ -60,7 +60,7 @@ script:
   - lunch lineage_$DEVICE_CODENAME-userdebug
   - make bacon > /dev/null 2>&1
 
-after_success:
+#after_success:
   - echo "Build successful, preparing to upload ROM and recovery image..."
   - cd $BUILD_DIR/crdroid/out/target/product/$DEVICE_CODENAME
 
@@ -83,7 +83,7 @@ after_success:
   - echo "Uploading recovery image..."
   - curl -s -H "Authorization: token $GITHUB_TOKEN" -H "Content-Type: application/octet-stream" --data-binary @$RECOVERY_FILE "$UPLOAD_URL?name=$(basename $RECOVERY_FILE)"
 
-after_failure:
+#after_failure:
   - echo "Build failed."
 
 notifications:
